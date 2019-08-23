@@ -37,6 +37,50 @@ limitations under the License.
 #include "tensorflow/core/platform/posix/error.h"
 #include "tensorflow/core/platform/posix/posix_file_system.h"
 
+extern "C" {
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_read_start(const char * name, size_t size) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_read_stop(const char * name, size_t size) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_write_start(const char * name, size_t size) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_write_stop(const char * name, size_t size) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_open_start(const char * name) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_open_stop(const char * name) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_close_start(const char * name) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_close_stop(const char * name) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_flush_start(const char * name) {
+
+}
+
+void __attribute__((weak)) __attribute__ ((visibility ("default"))) Tau_app_report_file_flush_stop(const char * name) {
+
+}
+
+} // extern "C"
+
 namespace tensorflow {
 
 // 128KB of copy buffer
@@ -60,6 +104,7 @@ class PosixRandomAccessFile : public RandomAccessFile {
 
   Status Read(uint64 offset, size_t n, StringPiece* result,
               char* scratch) const override {
+    Tau_app_report_file_read_start(this->filename_.c_str(), n);
     Status s;
     char* dst = scratch;
     while (n > 0 && s.ok()) {
@@ -86,6 +131,7 @@ class PosixRandomAccessFile : public RandomAccessFile {
       }
     }
     *result = StringPiece(scratch, dst - scratch);
+    Tau_app_report_file_read_stop(this->filename_.c_str(), n);
     return s;
   }
 };
@@ -107,15 +153,20 @@ class PosixWritableFile : public WritableFile {
   }
 
   Status Append(StringPiece data) override {
+    Tau_app_report_file_write_start(this->filename_.c_str(), data.size());
     size_t r = fwrite(data.data(), 1, data.size(), file_);
     if (r != data.size()) {
+        Tau_app_report_file_write_stop(this->filename_.c_str(), r);
       return IOError(filename_, errno);
     }
+    Tau_app_report_file_write_start(this->filename_.c_str(), r);
     return Status::OK();
   }
 
   Status Close() override {
+    Tau_app_report_file_close_start(this->filename_.c_str());
     if (file_ == nullptr) {
+      Tau_app_report_file_close_stop(this->filename_.c_str());
       return IOError(filename_, EBADF);
     }
     Status result;
@@ -123,13 +174,17 @@ class PosixWritableFile : public WritableFile {
       result = IOError(filename_, errno);
     }
     file_ = nullptr;
+    Tau_app_report_file_close_stop(this->filename_.c_str());
     return result;
   }
 
   Status Flush() override {
+    Tau_app_report_file_flush_start(this->filename_.c_str());
     if (fflush(file_) != 0) {
+      Tau_app_report_file_flush_stop(this->filename_.c_str());
       return IOError(filename_, errno);
     }
+    Tau_app_report_file_flush_stop(this->filename_.c_str());
     return Status::OK();
   }
 
@@ -139,10 +194,12 @@ class PosixWritableFile : public WritableFile {
   }
 
   Status Sync() override {
+    Tau_app_report_file_flush_start(this->filename_.c_str());
     Status s;
     if (fflush(file_) != 0) {
       s = IOError(filename_, errno);
     }
+    Tau_app_report_file_flush_stop(this->filename_.c_str());
     return s;
   }
 
@@ -175,6 +232,7 @@ class PosixReadOnlyMemoryRegion : public ReadOnlyMemoryRegion {
 
 Status PosixFileSystem::NewRandomAccessFile(
     const string& fname, std::unique_ptr<RandomAccessFile>* result) {
+  Tau_app_report_file_open_start(fname.c_str());
   string translated_fname = TranslateName(fname);
   Status s;
   int fd = open(translated_fname.c_str(), O_RDONLY);
@@ -183,11 +241,13 @@ Status PosixFileSystem::NewRandomAccessFile(
   } else {
     result->reset(new PosixRandomAccessFile(translated_fname, fd));
   }
+  Tau_app_report_file_open_stop(fname.c_str());
   return s;
 }
 
 Status PosixFileSystem::NewWritableFile(const string& fname,
                                         std::unique_ptr<WritableFile>* result) {
+  Tau_app_report_file_open_start(fname.c_str());
   string translated_fname = TranslateName(fname);
   Status s;
   FILE* f = fopen(translated_fname.c_str(), "w");
@@ -196,11 +256,13 @@ Status PosixFileSystem::NewWritableFile(const string& fname,
   } else {
     result->reset(new PosixWritableFile(translated_fname, f));
   }
+  Tau_app_report_file_open_stop(fname.c_str());
   return s;
 }
 
 Status PosixFileSystem::NewAppendableFile(
     const string& fname, std::unique_ptr<WritableFile>* result) {
+  Tau_app_report_file_open_start(fname.c_str());
   string translated_fname = TranslateName(fname);
   Status s;
   FILE* f = fopen(translated_fname.c_str(), "a");
@@ -209,6 +271,7 @@ Status PosixFileSystem::NewAppendableFile(
   } else {
     result->reset(new PosixWritableFile(translated_fname, f));
   }
+  Tau_app_report_file_open_stop(fname.c_str());
   return s;
 }
 
